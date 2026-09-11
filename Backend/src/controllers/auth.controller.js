@@ -1,4 +1,5 @@
 const userModel = require("../models/user.model");
+const redis = require("../config/cache");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
@@ -142,10 +143,68 @@ const getMeController = async(req,res)=>{
 }
 
 
+// const logOutController = async(req,res)=>{
+//     const token = req.cookies.token
+//     redis.set(token, Date.now().toString())
+//     res.clearCookie("token");
+
+    
+//     res.status(200).json({
+//         message:"user logOut successfully ."
+//     })
+
+// }
+
+
+const logOutController = async (req, res) => {
+    try {
+        const token = req.cookies?.token;
+
+        if (!token) {
+            return res.status(200).json({
+                success: true,
+                message: "User already logged out."
+            });
+        }
+
+        const expiresAt = req.user.exp;
+
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        const remainingTime = expiresAt - currentTime;
+
+        if (remainingTime > 0) {
+            await redis.set(
+                `blacklist:${token}`,
+                "1",
+                "EX",
+                remainingTime
+            );
+        }
+
+        res.clearCookie("token");
+
+        return res.status(200).json({
+            success: true,
+            message: "User logged out successfully."
+        });
+
+    } catch (error) {
+        console.error("Logout error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error."
+        });
+    }
+};
+
+
 
    
 module.exports = {
     registerController,
     loginController,
-    getMeController
+    getMeController,
+    logOutController
 };

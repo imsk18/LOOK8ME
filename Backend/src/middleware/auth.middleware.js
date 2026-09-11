@@ -1,26 +1,45 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
+const redis = require("../config/cache");
 
-const authUser = async(req,res,next)=>{
-    try{
-        const token = req.cookies.token;
-        if(!token){
+const authUser = async (req, res, next) => {
+    try {
+        const token = req.cookies?.token;
+
+        if (!token) {
             return res.status(401).json({
-                message:"token not provided"
-            })
+                success: false,
+                message: "Authentication required."
+            });
         }
-        const decoded = jwt.verify(token,process.env.JWT_SECRET);
+
+        const isBlacklisted = await redis.get(
+            `blacklist:${token}`
+        );
+
+        if (isBlacklisted) {
+            return res.status(401).json({
+                success: false,
+                message: "Token has been revoked."
+            });
+        }
+
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET
+        );
+
         req.user = decoded;
-        next()
 
+        next();
 
-    }catch(err){
+    } catch (error) {
+        console.error("Auth error:", error);
+
         return res.status(401).json({
-            message:"invalid token or expire"
-        })
+            success: false,
+            message: "Invalid or expired token."
+        });
     }
-     
-    
 };
-   
 
-module.exports = authUser
+module.exports = authUser;
